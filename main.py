@@ -7,17 +7,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from config import (
+from alignment_toolkit.config import (
     DEFAULT_CI, DEFAULT_FIELD_SIZE, DEFAULT_THETA_UNITS,
     MIN_N_FOR_CI, PRISM_TABLES, REGIONS,
 )
-
-from cellpose_extract import folder_to_dataset_csv
-from processing import combine_split_files
-from quadrants import assign_quadrants
-from summarise import summarise_frames
-from prism import make_prism_table
-from outputs import make_output_folders
+from alignment_toolkit.cellpose_extract import folder_to_dataset_csv
+from alignment_toolkit.processing import combine_split_files
+from alignment_toolkit.quadrants import assign_quadrants
+from alignment_toolkit.summarise import summarise_frames
+from alignment_toolkit.prism import make_prism_table
+from alignment_toolkit.outputs import make_output_folders
 
 
 def run_analyse(args):

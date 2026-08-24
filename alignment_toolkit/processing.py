@@ -2,8 +2,7 @@
 import numpy as np
 import pandas as pd
 
-from columns import read_one_csv
-from cellpose_extract import frame_from_name   # for ordering, if needed
+from .columns import read_one_csv
 
 
 def combine_split_files(file_list, theta_units):

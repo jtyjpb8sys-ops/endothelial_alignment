@@ -1,5 +1,5 @@
 
-from config import REGIONS
+from .config import REGIONS
 
 
 def make_prism_table(summary, value_col):

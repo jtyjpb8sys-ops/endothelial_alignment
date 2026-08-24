@@ -2,7 +2,7 @@
 import numpy as np
 from scipy.stats import norm
 
-from config import MIN_N_FOR_CI
+from .config import MIN_N_FOR_CI
 
 def median_ci(values, ci):
     v = np.asarray(values, dtype=float)

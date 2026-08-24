@@ -1,5 +1,5 @@
 
-from config import PRISM_TABLES
+from .config import PRISM_TABLES
 
 
 def make_output_folders(output_dir):
@@ -13,5 +13,5 @@ def make_output_folders(output_dir):
 
     for folder in folders.values():
         folder.mkdir(parents=True, exist_ok=True)
-        
+
     return folders

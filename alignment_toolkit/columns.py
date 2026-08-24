@@ -1,7 +1,7 @@
 
 import pandas as pd
 
-from config import FRAME_NAMES, THETA_NAMES, X_NAMES, Y_NAMES
+from .config import FRAME_NAMES, THETA_NAMES, X_NAMES, Y_NAMES
 
 
 def find_column(df, possible_names, required=True):

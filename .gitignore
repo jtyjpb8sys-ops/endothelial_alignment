@@ -5,6 +5,12 @@ build/
 dist/
 wheels/
 *.egg-info
+*.pyc
+.DS_Store
+*_seg.npy
+ROI_CSVs/
+Endothelial_Alignment_*/
+*_cp_masks.png
 
 # Virtual environments
 .venv

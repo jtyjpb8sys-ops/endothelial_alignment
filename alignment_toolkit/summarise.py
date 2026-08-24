@@ -1,8 +1,8 @@
 
 import pandas as pd
 
-from config import METRICS, REGIONS
-from stats import median_ci, quartiles
+from .config import METRICS, REGIONS
+from .stats import median_ci, quartiles
 
 
 def region_row(rdf, dataset_name, oxygen, condition, frame, region, ci):
