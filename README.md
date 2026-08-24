@@ -1,7 +1,9 @@
 # Endothelial Cell Alignment Workflow
 
 A two-stage pipeline that turns Cellpose segmentation masks into per-quadrant
-alignment statistics across a time series (one frame = one hour).
+alignment statistics across a time series. Each mask is one hourly timepoint, and
+frames are numbered from the baseline: `FRAME` 0 = baseline, `FRAME` 1 = 1 hour,
+and so on.
 
 **Stage 1 — `extract`:** read Cellpose masks, fit an ellipse to every ROI, and
 write one per-dataset CSV of orientation angles and centroids.
@@ -33,7 +35,9 @@ endothelial_alignment/
     ├── stats.py                # median CI (order-statistic), quartiles
     ├── summarise.py            # per-frame x region summary table
     ├── prism.py                # reshape into wide GraphPad Prism tables
-    └── outputs.py              # create the output folder layout
+    ├── analysis.py             # shared analyse logic (CSV folder -> summaries)
+    ├── outputs.py              # create the output folder layout
+    └── batch.py                # folder picker + walk a cell-line tree
 ```
 
 ## Requirements
@@ -89,10 +93,17 @@ analysis this is split on the first underscore into `oxygen` (`21`) and
 
 ## Frame ordering (time series)
 
-Each Cellpose mask file is one hour. Ordering comes from the trailing number in
-the filename: `..._001` -> hour 1, `..._002` -> hour 2, and so on. Files are read
-in ascending order and stacked into a single dataset, so a folder of hourly masks
-becomes one CSV with consecutive `FRAME` values.
+Each Cellpose mask file is one hourly timepoint. Ordering comes from the trailing
+number in the filename, and the numbering is shifted so the first file is the
+baseline (hour 0):
+
+- `..._001` -> `FRAME` 0 (baseline / pre-flow)
+- `..._002` -> `FRAME` 1 (1 hour)
+- `..._003` -> `FRAME` 2 (2 hours), and so on
+
+So `FRAME` is the number of hours since baseline. Files are read in ascending
+order and stacked into a single dataset, giving one CSV with consecutive `FRAME`
+values starting at 0. This assumes filenames start numbering at `_001`.
 
 ## Input files
 
@@ -138,6 +149,37 @@ Analyse options:
 - `--theta_units` — `radians` (default) or `degrees`
 - `--ci` — confidence level, default 95
 - `--field_size` — square image edge length in px (default 1992)
+
+**Batch — process a whole cell-line tree in one go:**
+
+```
+python main.py batch
+```
+
+With no `--input_dir`, a folder picker opens; select the cell-line folder. The
+tool walks three levels down (oxygen / flow / replicate), and for every replicate
+folder that contains masks it runs extract then analyse, naming each dataset from
+its folder path and writing outputs inside that replicate folder.
+
+The expected folder structure is:
+
+```
+Cell line/
+    Oxygen 21%/
+        4dyn laminar/
+            Replicate 1/
+                ..._001_seg.npy   (baseline)
+                ..._002_seg.npy   (1 hour)
+                ...
+```
+
+Folder names are cleaned into the `oxygen_flow_replicate` convention
+automatically, e.g. `Oxygen 21%` / `4dyn laminar` / `Replicate 1` becomes
+`21_4dyn_1`. Replicate folders with no masks are skipped, so a partially
+segmented tree is fine, and the batch is safe to re-run.
+
+Batch options mirror the two stages: `--input_dir`, `--theta_units`, `--ci`,
+`--field_size`, `--reference_deg`, `--min_area`.
 
 ## Outputs
 
