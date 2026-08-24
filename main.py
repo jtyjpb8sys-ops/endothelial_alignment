@@ -89,11 +89,40 @@ def run_extract(args):
     print(f"  {n_hours} hour(s), {n_rois} ROIs total")
     print(f"\nNext:  python main.py analyse --input_dir {out_dir}")
 
-
-
 def main():
-    print("Hello from endothelial-alignment!")
+    parser = argparse.ArgumentParser(
+        description="Endothelial alignment toolkit."
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
 
+    p_ex = sub.add_parser("extract", help="Cellpose masks -> per-ROI CSV.")
+    p_ex.add_argument("--input_dir", required=True,
+                      help="Folder of *_seg.npy mask files.")
+    p_ex.add_argument("--output_dir", default=None,
+                      help="Where to write the CSV (default: <input>/ROI_CSVs).")
+    p_ex.add_argument("--name", default=None,
+                      help="Dataset name, e.g. 21_4dyn_1.")
+    p_ex.add_argument("--reference_deg", type=float, default=0.0,
+                      help="Flow axis in degrees (default 0 = horizontal).")
+    p_ex.add_argument("--min_area", type=int, default=0,
+                      help="Drop ROIs smaller than this many pixels.")
+    p_ex.set_defaults(func=run_extract)
+
+    p_an = sub.add_parser("analyse", help="Per-ROI CSV -> quadrant summaries.")
+    p_an.add_argument("--input_dir", required=True,
+                      help="Folder containing the dataset CSV(s).")
+    p_an.add_argument("--output_dir", default=None)
+
+
+    p_an.add_argument("--theta_units", choices=["radians", "degrees"],
+                      default=DEFAULT_THETA_UNITS)
+    p_an.add_argument("--ci", type=float, default=DEFAULT_CI)
+    p_an.add_argument("--field_size", type=float, default=DEFAULT_FIELD_SIZE)
+
+    p_an.set_defaults(func=run_analyse)
+
+    args = parser.parse_args()
+    args.func(args)
 
 if __name__ == "__main__":
     main()
