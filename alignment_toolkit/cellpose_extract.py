@@ -8,7 +8,6 @@ from skimage.measure import regionprops_table
 
 
 def load_masks_from_seg_npy(path):
-    """Return the label array from a Cellpose *_seg.npy file."""
     data = np.load(path,allow_pickle=True)
     obj = data.item() if data.dtype == object else data
     if isinstance(obj, dict):
@@ -20,22 +19,14 @@ def load_masks_from_seg_npy(path):
     return np.asarray(obj)
 
 def masks_to_roi_table(masks, frame=1, reference_angle=0.0, min_area=0):
-    """Fit an ellipse per label; return a per-ROI table (one row per ROI).
-
-    Columns out: FRAME, ELLIPSE_THETA (radians, x-axis convention),
-                 POSITION_X, POSITION_Y, MAJOR, MINOR, AREA, label.
-    """
     masks = np.asarray(masks)
 
-    # If the frame has no ROIs (max label 0), return an empty table
-    # with the right columns so downstream concat doesn't break.
     if masks.max() == 0:
         return pd.DataFrame(
             columns=["FRAME", "ELLIPSE_THETA", "POSITION_X", "POSITION_Y",
                      "MAJOR", "MINOR", "AREA", "label"]
         )
 
-    # Use skimage.measure.regionprops_table to get the ellipse parameters.
     props = regionprops_table(masks, properties=("label", 
                                                  "centroid", 
                                                  "orientation", 
@@ -53,7 +44,6 @@ def masks_to_roi_table(masks, frame=1, reference_angle=0.0, min_area=0):
     theta_out = theta_x - float(reference_angle)
     theta_out = (theta_out + np.pi / 2.0) % np.pi - np.pi / 2.0
 
-    # Build and return the output DataFrame.
     return pd.DataFrame({
         "FRAME": int(frame),
         "ELLIPSE_THETA": theta_out,
@@ -66,7 +56,6 @@ def masks_to_roi_table(masks, frame=1, reference_angle=0.0, min_area=0):
     })
 
 def mask_file_to_table(path, frame=None, reference_angle=0.0, min_area=0):
-    """Load one Cellpose mask file and return its per-ROI table."""
     masks = load_masks_from_seg_npy(path)
     if frame is None:
         frame = frame_from_name(path)
@@ -75,14 +64,12 @@ def mask_file_to_table(path, frame=None, reference_angle=0.0, min_area=0):
     )
 
 def _strip_suffix(path):
-    """Remove extension and any cp_masks/seg/masks tag from a filename."""
     stem = Path(path).name
     stem = re.sub(r"\.(png|npy|tif|tiff)$", "", stem, flags=re.I)
     stem = re.sub(r"_(cp_masks|seg|masks)$", "", stem, flags=re.I)
     return stem
 
 def frame_from_name(path):
-    """Return the hour from a filename's trailing number ('..._001' -> 1)."""
     stem = _strip_suffix(path)
     match = re.search(r"(\d+)\s*$", stem)
     if match:
@@ -90,7 +77,6 @@ def frame_from_name(path):
     return 1
 
 def find_mask_files(folder):
-    """Return mask files in `folder`, ordered by hour. Prefer .npy over .png."""
     folder = Path(folder)
     files = sorted(folder.glob("*_seg.npy"))
     if not files:
@@ -100,9 +86,6 @@ def find_mask_files(folder):
 
 def folder_to_dataset_csv(folder, out_dir, name=None,
                           reference_angle=0.0, min_area=0):
-    """Turn one folder of ordered masks into a single dataset CSV.
-    Returns (csv_path, n_hours, n_rois_total).
-    """
     folder, out_dir = Path(folder), Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
