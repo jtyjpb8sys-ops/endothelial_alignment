@@ -45,7 +45,7 @@ def dataset_name_from_path(oxygen, flow, replicate):
     ox = re.sub(r"(?i)oxygen", "", oxygen)      
     ox = re.sub(r"[^0-9.]", "", ox)             
   
-    fl = flow.split("_")[0]
+    fl = re.split(r"[\s_]+", flow.strip())[0]
 
     rep = re.sub(r"[^0-9]", "", replicate)
 
