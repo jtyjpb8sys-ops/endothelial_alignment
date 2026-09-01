@@ -4,6 +4,8 @@ from tkinter import filedialog
 from pathlib import Path
 import re
 
+import pandas as pd
+
 from .cellpose_extract import folder_to_dataset_csv
 from .analysis import analyse_folder
 
@@ -58,8 +60,9 @@ def run_batch(cell_line_dir, theta_units="radians", ci=95.0,
         raise SystemExit(f"No replicate folders with masks under {cell_line_dir}")
     print(f"Found {len(replicates)} replicate(s) to process.\n")
 
+    qc_all = []
     for oxygen, flow, replicate, rep_dir in replicates:
-       
+
         name = dataset_name_from_path(oxygen, flow, replicate)
         print(f"=== {name}   ({rep_dir.name}) ===")
 
@@ -70,6 +73,16 @@ def run_batch(cell_line_dir, theta_units="radians", ci=95.0,
         )
         print(f"  extracted {n_rois} ROIs over {n_hours} hour(s)")
 
-        analyse_folder(out_dir, theta_units=theta_units, ci=ci,
-                         field_size=field_size)
+        output_dir = analyse_folder(out_dir, theta_units=theta_units, ci=ci,
+                                    field_size=field_size)
         print(f"  analysed -> {out_dir}\n")
+
+        qc_path = output_dir / "QC" / "QC_summary.csv"
+        if qc_path.exists():
+            qc_all.append(pd.read_csv(qc_path))
+
+    if qc_all:
+        combined_qc = pd.concat(qc_all, ignore_index=True)
+        combined_qc.to_csv(cell_line_dir / "ALL_QC_summary.csv", index=False)
+        print(f"Combined QC for {len(qc_all)} datasets -> "
+              f"{cell_line_dir / 'ALL_QC_summary.csv'}")
