@@ -71,10 +71,10 @@ def _strip_suffix(path):
 
 def frame_from_name(path):
     stem = _strip_suffix(path)
-    match = re.search(r"(\d+)\s*$", stem)
-    if match:
-        return int(match.group(1)) - 1
-    return 0
+    m = re.search(r"_(\d+)[^_]*$", stem)
+    if m:
+        return int(m.group(1)) - 1
+    raise ValueError(f"Could not parse frame number from filename: {path}")
 
 def find_mask_files(folder):
     folder = Path(folder)
