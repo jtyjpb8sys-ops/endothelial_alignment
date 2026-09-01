@@ -4,7 +4,6 @@ from tkinter import filedialog
 from pathlib import Path
 import re
 
-
 from .cellpose_extract import folder_to_dataset_csv
 from .analysis import analyse_folder
 
@@ -42,14 +41,14 @@ def find_replicate_folders(cell_line_dir):
     return replicates
 
 def dataset_name_from_path(oxygen, flow, replicate):
-    ox = re.sub(r"(?i)oxygen", "", oxygen)      
-    ox = re.sub(r"[^0-9.]", "", ox)             
-  
-    fl = re.split(r"[\s_]+", flow.strip())[0]
+    ox = re.sub(r"(?i)oxygen", "", oxygen)
+    ox = re.sub(r"[^0-9.]", "", ox)
+
+    cond = re.sub(r"\s+", "_", flow.strip())
 
     rep = re.sub(r"[^0-9]", "", replicate)
 
-    return f"{ox}_{fl}_{rep}"
+    return f"{ox}_{cond}_{rep}"
 
 def run_batch(cell_line_dir, theta_units="radians", ci=95.0,
               field_size=1992.0, reference_angle=0.0, min_area=0):

@@ -73,8 +73,8 @@ def frame_from_name(path):
     stem = _strip_suffix(path)
     match = re.search(r"(\d+)\s*$", stem)
     if match:
-        return int(match.group(1))
-    return 1
+        return int(match.group(1)) - 1
+    return 0
 
 def find_mask_files(folder):
     folder = Path(folder)
