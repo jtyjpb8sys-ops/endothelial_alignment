@@ -24,7 +24,7 @@ angle, with: median, confidence interval, n ROIs, and interquartile range.
 
 ```
 endothelial_alignment/
-├── main.py                     # command-line entry point (extract / analyse)
+├── main.py                     # command-line entry point (extract / analyse / batch)
 └── alignment_toolkit/          # the package of modules
     ├── __init__.py
     ├── config.py               # defaults, region/metric definitions, column names
@@ -45,6 +45,8 @@ endothelial_alignment/
 - Python 3.10+
 - `numpy`, `pandas`, `scipy`, `scikit-image` (and `Pillow` only if reading
   `*_cp_masks.png` instead of `*_seg.npy`)
+- `tkinter` for the batch folder picker — ships with Python, not installed via
+  pip; the picker is only needed when running `batch` without `--input_dir`
 
 Install into your environment:
 
@@ -78,7 +80,17 @@ The Alignment Parameter (AP) is calculated per ROI:
 The reference axis is the flow direction. By default flow is assumed horizontal
 (the image x-axis, `--reference_deg 0`). If flow runs at another angle, pass it
 in degrees with `--reference_deg` during extraction and AP is measured relative
-to that axis.
+to that axis. For example, if flow runs vertically in the images, use
+`--reference_deg 90`.
+
+The reference angle is applied at extract time (it is baked into the stored
+angles), so different orientations are written to separate folders and never
+overwrite each other: `--reference_deg 0` writes to `ROI_CSVs/`, while
+`--reference_deg 90` writes to `ROI_CSVs_ref90/`. This lets you extract the same
+data both ways and compare. Because the choice lives in the folder name, an
+`analyse`-only run must be given the same `--reference_deg` so it reads from the
+matching folder — at that stage the flag only selects the folder, it does not
+change any maths.
 
 A folded orientation angle is also reported:
 
@@ -87,9 +99,17 @@ A folded orientation angle is also reported:
 
 ## Naming convention
 
-Name each dataset `oxygen_flowcondition_replicate`, e.g. `21_4dyn_1`. During
-analysis this is split on the first underscore into `oxygen` (`21`) and
-`condition` (`4dyn_1`) for the summary and QC columns.
+Datasets are named `oxygen_condition_replicate`, e.g. `21_4dyn_laminar_1`. In
+batch mode the name is built automatically from the folder path: the oxygen
+folder is reduced to its number (`Oxygen 21%` -> `21`), the flow folder name is
+kept verbatim with spaces turned into underscores (`4dyn laminar` ->
+`4dyn_laminar`, `4dyn 1hz oscilatory` -> `4dyn_1hz_oscilatory`), and the
+replicate folder is reduced to its number (`Replicate_1` -> `1`). Keeping the
+full flow name means conditions that share a flow rate (`4dyn laminar` vs
+`4dyn 1hz oscilatory`) get distinct names rather than colliding.
+
+During analysis the name is split on the first underscore into `oxygen` (`21`)
+and `condition` (`4dyn_laminar_1`) for the summary and QC columns.
 
 ## Frame ordering (time series)
 
@@ -153,40 +173,74 @@ Analyse options:
 **Batch — process a whole cell-line tree in one go:**
 
 ```
-python main.py batch
+python main.py batch --input_dir /path/to/CellLine --reference_deg 90
 ```
 
 With no `--input_dir`, a folder picker opens; select the cell-line folder. The
 tool walks three levels down (oxygen / flow / replicate), and for every replicate
-folder that contains masks it runs extract then analyse, naming each dataset from
-its folder path and writing outputs inside that replicate folder.
+folder that contains masks it names the dataset from its folder path and writes
+outputs inside that replicate folder.
 
 The expected folder structure is:
 
 ```
-Cell line/
+Cell line/                     (e.g. HUtMEC)
     Oxygen 21%/
         4dyn laminar/
-            Replicate 1/
-                ..._001_seg.npy   (baseline)
+            Replicate_1/
+                ..._001_seg.npy   (baseline, hour 0)
                 ..._002_seg.npy   (1 hour)
                 ...
 ```
 
-Folder names are cleaned into the `oxygen_flow_replicate` convention
-automatically, e.g. `Oxygen 21%` / `4dyn laminar` / `Replicate 1` becomes
-`21_4dyn_1`. Replicate folders with no masks are skipped, so a partially
-segmented tree is fine, and the batch is safe to re-run.
+Replicate folders with no masks are skipped, so a partially segmented tree is
+fine, and the batch is safe to re-run.
 
-Batch options mirror the two stages: `--input_dir`, `--theta_units`, `--ci`,
-`--field_size`, `--reference_deg`, `--min_area`.
+The `--stage` flag chooses which of the two stages to run:
+
+- `--stage extract` — the slow pass: read every replicate's masks and write its
+  per-ROI CSV. Nothing is analysed. Run this once per reference angle.
+- `--stage analyse` — the fast pass: read the CSVs and write summaries, Prism
+  tables and QC. Re-runnable (e.g. to change `--ci`). Reads from the folder
+  matching `--reference_deg`, so pass the same angle you extracted with.
+- `--stage both` (default) — extract then analyse in one go.
+
+Typical two-pass workflow for vertically-running flow:
+
+```
+python main.py batch --input_dir /path/to/HUtMEC --stage extract --reference_deg 90
+python main.py batch --input_dir /path/to/HUtMEC --stage analyse --reference_deg 90
+```
+
+Other batch options mirror the two stages: `--theta_units`, `--ci`,
+`--field_size`, `--min_area`.
+
+To analyse a single replicate on its own (for spot-checks or reprocessing one
+dataset), point `analyse` straight at that replicate's ROI folder:
+
+```
+python main.py analyse --input_dir '/path/to/HUtMEC/Oxygen 21%/4dyn laminar/Replicate_1/ROI_CSVs'
+```
 
 ## Outputs
 
-Under the results folder (`Endothelial_Alignment_<date>` by default):
+Under the results folder (`Endothelial_Alignment_<date>` by default, written
+inside the replicate's ROI folder):
 
 - `Per_Dataset_Summaries/` — the full long-format summary per dataset
 - `Prism/AP_Median`, `Prism/AP_CI_low`, `Prism/AP_CI_high`,
   `Prism/ThetaDeg_Median` — wide tables (frames down, quadrants across) for
   GraphPad Prism
+- `Prism/AP_Median/<name>_AP_median_IQR.csv` and `..._AP_median_CI.csv` —
+  combined tables where each cell reads `median [low, high]` (3 decimals), one
+  file using the interquartile range as the bounds, the other the confidence
+  interval
 - `Combined/ALL_summaries_long.csv` — every dataset stacked into one table
+- `QC/QC_summary.csv` — per-dataset quality check: frame count, min/median/max
+  ROIs per quadrant-frame, and how many quadrant-frames fell below the minimum
+  needed for a confidence interval (`N_QUADRANT_FRAMES_BELOW_CI_MIN`)
+
+After a batch run, a combined QC file for every dataset processed is written at
+the cell-line root as `ALL_QC_summary.csv` — one row per dataset, so the whole
+experiment's data quality can be scanned at a glance (sparse or failed wells show
+up as high `N_QUADRANT_FRAMES_BELOW_CI_MIN` values).

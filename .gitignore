@@ -9,8 +9,13 @@ wheels/
 .DS_Store
 *_seg.npy
 ROI_CSVs/
+ROI_CSVs_ref*
 Endothelial_Alignment_*/
 *_cp_masks.png
+
+alignment_toolkit/models/
+*.pt
+*.pth
 
 # Virtual environments
 .venv

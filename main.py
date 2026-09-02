@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from alignment_toolkit.batch import choose_folder_with_dialog
+from alignment_toolkit.batch import run_batch, choose_folder_with_dialog, roi_folder_name
 from alignment_toolkit.config import (
     DEFAULT_CI, DEFAULT_FIELD_SIZE, DEFAULT_THETA_UNITS,
     MIN_N_FOR_CI, PRISM_TABLES, REGIONS,
@@ -19,7 +19,7 @@ from alignment_toolkit.summarise import summarise_frames
 from alignment_toolkit.prism import make_prism_table
 from alignment_toolkit.outputs import make_output_folders
 from alignment_toolkit.analysis import analyse_folder
-from alignment_toolkit.batch import run_batch, choose_folder_with_dialog
+
 
 def run_analyse(args):
     output_dir = analyse_folder(
@@ -33,27 +33,26 @@ def run_extract(args):
     if not input_dir.exists():
         raise SystemExit(f"Input folder does not exist: {input_dir}")
 
-    out_dir = Path(args.output_dir) if args.output_dir else input_dir / "ROI_CSVs"
-    reference_angle = np.radians(args.reference_deg)
+    out_dir = (Path(args.output_dir) if args.output_dir
+               else input_dir / roi_folder_name(args.reference_deg))
 
     csv_path, n_hours, n_rois = folder_to_dataset_csv(
         input_dir, out_dir, name=args.name,
-        reference_angle=reference_angle, min_area=args.min_area
+        reference_deg=args.reference_deg, min_area=args.min_area,
     )
-
     print(f"\nWrote {csv_path}")
     print(f"  {n_hours} hour(s), {n_rois} ROIs total")
     print(f"\nNext:  python main.py analyse --input_dir {out_dir}")
+    
 
 def run_batch_cmd(args):
-    # If no --input_dir given, pop up the folder picker.
     cell_line = Path(args.input_dir) if args.input_dir else choose_folder_with_dialog()
-    run_batch(
-        cell_line,
-        theta_units=args.theta_units, ci=args.ci, field_size=args.field_size,
-        reference_angle=np.radians(args.reference_deg), min_area=args.min_area,
-    )
-
+    run_batch(cell_line, stage=args.stage,
+              theta_units=args.theta_units, ci=args.ci,
+              field_size=args.field_size,
+              reference_deg=args.reference_deg,
+              min_area=args.min_area)
+    
 def main():
     parser = argparse.ArgumentParser(
         description="Endothelial alignment toolkit."
@@ -81,6 +80,8 @@ def main():
     p_ba = sub.add_parser("batch", help="Process a whole Cell line tree.")
     p_ba.add_argument("--input_dir", default=None,
                       help="Cell line folder. Omit to open a folder picker.")
+    p_ba.add_argument("--stage", choices=["extract", "analyse", "both"], default="both",
+                      help="Which stage(s) to run (default: both).")
     p_ba.add_argument("--theta_units", choices=["radians", "degrees"],
                       default=DEFAULT_THETA_UNITS)
     p_ba.add_argument("--ci", type=float, default=DEFAULT_CI)

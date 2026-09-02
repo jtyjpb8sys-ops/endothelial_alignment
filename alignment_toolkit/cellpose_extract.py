@@ -85,7 +85,7 @@ def find_mask_files(folder):
     return files
 
 def folder_to_dataset_csv(folder, out_dir, name=None,
-                          reference_angle=0.0, min_area=0):
+                          reference_deg=0.0, min_area=0):
     folder, out_dir = Path(folder), Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -98,7 +98,7 @@ def folder_to_dataset_csv(folder, out_dir, name=None,
     tables = []
     for f in files:
         hour = frame_from_name(f)
-        table = mask_file_to_table(f, frame=hour, reference_angle=reference_angle, min_area=min_area)
+        table = mask_file_to_table(f, frame=hour, reference_angle=np.radians(reference_deg), min_area=min_area)
         tables.append(table)
         print(f"Processed {f.name} (hour {hour})")
 

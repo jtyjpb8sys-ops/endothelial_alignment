@@ -52,37 +52,47 @@ def dataset_name_from_path(oxygen, flow, replicate):
 
     return f"{ox}_{cond}_{rep}"
 
-def run_batch(cell_line_dir, theta_units="radians", ci=95.0,
-              field_size=1992.0, reference_angle=0.0, min_area=0):
+def run_batch(cell_line_dir, stage="both", theta_units="radians", ci=95.0,
+              field_size=1992.0, reference_deg=0.0, min_area=0):
     cell_line_dir = Path(cell_line_dir)
     replicates = find_replicate_folders(cell_line_dir)
     if not replicates:
         raise SystemExit(f"No replicate folders with masks under {cell_line_dir}")
-    print(f"Found {len(replicates)} replicate(s) to process.\n")
+    print(f"Found {len(replicates)} replicate(s), stage={stage}.\n")
 
     qc_all = []
     for oxygen, flow, replicate, rep_dir in replicates:
-
         name = dataset_name_from_path(oxygen, flow, replicate)
         print(f"=== {name}   ({rep_dir.name}) ===")
+        out_dir = rep_dir / roi_folder_name(reference_deg)
 
-        out_dir = rep_dir / "ROI_CSVs"
-        csv_path, n_hours, n_rois = folder_to_dataset_csv(
-            rep_dir, out_dir, name=name,
-            reference_angle=reference_angle, min_area=min_area,
-        )
-        print(f"  extracted {n_rois} ROIs over {n_hours} hour(s)")
+        if stage in ("extract", "both"):
+            csv_path, n_hours, n_rois = folder_to_dataset_csv(
+                rep_dir, out_dir, name=name,
+                reference_deg=reference_deg, min_area=min_area,
+            )
+            print(f"  extracted {n_rois} ROIs over {n_hours} hour(s)")
 
-        output_dir = analyse_folder(out_dir, theta_units=theta_units, ci=ci,
-                                    field_size=field_size)
-        print(f"  analysed -> {out_dir}\n")
+        if stage in ("analyse", "both"):
+            if not out_dir.exists():
+                print(f"  no ROI_CSVs found, skipping analyse "
+                      f"(run extract first)")
+                continue
+            output_dir = analyse_folder(out_dir, theta_units=theta_units,
+                                        ci=ci, field_size=field_size)
+            print(f"  analysed -> {out_dir}\n")
 
-        qc_path = output_dir / "QC" / "QC_summary.csv"
-        if qc_path.exists():
-            qc_all.append(pd.read_csv(qc_path))
+            qc_path = output_dir / "QC" / "QC_summary.csv"
+            if qc_path.exists():
+                qc_all.append(pd.read_csv(qc_path))
 
     if qc_all:
         combined_qc = pd.concat(qc_all, ignore_index=True)
         combined_qc.to_csv(cell_line_dir / "ALL_QC_summary.csv", index=False)
         print(f"Combined QC for {len(qc_all)} datasets -> "
               f"{cell_line_dir / 'ALL_QC_summary.csv'}")
+
+def roi_folder_name(reference_deg):
+    if reference_deg == 0:
+        return "ROI_CSVs"
+    return f"ROI_CSVs_ref{int(round(reference_deg))}"
