@@ -10,7 +10,8 @@ import pandas as pd
 from alignment_toolkit.batch import run_batch, choose_folder_with_dialog, roi_folder_name
 from alignment_toolkit.config import (
     DEFAULT_CI, DEFAULT_FIELD_SIZE, DEFAULT_THETA_UNITS,
-    MIN_N_FOR_CI, PRISM_TABLES, REGIONS,
+    MIN_N_FOR_CI, PRISM_TABLES, REGIONS, DEFAULT_MATCH_DIST,
+    Z_REFERENCE_CONDITION, Z_REFERENCE_OXYGEN,
 )
 from alignment_toolkit.cellpose_extract import folder_to_dataset_csv
 from alignment_toolkit.processing import combine_split_files
@@ -25,6 +26,8 @@ def run_analyse(args):
     output_dir = analyse_folder(
         args.input_dir, args.output_dir,
         theta_units=args.theta_units, ci=args.ci, field_size=args.field_size,
+        match_dist=args.match_dist,
+        z_condition=args.z_reference_condition, z_oxygen=args.z_reference_oxygen,
     )
     print(f"\nDone. Outputs in: {output_dir}")
 
@@ -51,7 +54,10 @@ def run_batch_cmd(args):
               theta_units=args.theta_units, ci=args.ci,
               field_size=args.field_size,
               reference_deg=args.reference_deg,
-              min_area=args.min_area)
+              min_area=args.min_area,
+              match_dist=args.match_dist,
+              z_condition=args.z_reference_condition,
+              z_oxygen=args.z_reference_oxygen)
     
 def main():
     parser = argparse.ArgumentParser(
@@ -88,12 +94,24 @@ def main():
     p_ba.add_argument("--field_size", type=float, default=DEFAULT_FIELD_SIZE)
     p_ba.add_argument("--reference_deg", type=float, default=0.0)
     p_ba.add_argument("--min_area", type=int, default=0)
+    p_ba.add_argument("--match_dist", type=float, default=DEFAULT_MATCH_DIST,
+                      help="Max distance (px) for matching a cell between frames (default 35).")
+    p_ba.add_argument("--z_reference_condition", default=Z_REFERENCE_CONDITION,
+                      help="Condition used as the z-score reference (default Static).")
+    p_ba.add_argument("--z_reference_oxygen", default=Z_REFERENCE_OXYGEN,
+                      help="Oxygen of the z-score reference datasets (default 21).")
     p_ba.set_defaults(func=run_batch_cmd)
 
     p_an.add_argument("--theta_units", choices=["radians", "degrees"],
                       default=DEFAULT_THETA_UNITS)
     p_an.add_argument("--ci", type=float, default=DEFAULT_CI)
     p_an.add_argument("--field_size", type=float, default=DEFAULT_FIELD_SIZE)
+    p_an.add_argument("--match_dist", type=float, default=DEFAULT_MATCH_DIST,
+                      help="Max distance (px) for matching a cell between frames (default 35).")
+    p_an.add_argument("--z_reference_condition", default=Z_REFERENCE_CONDITION,
+                      help="Condition used as the z-score reference (default Static).")
+    p_an.add_argument("--z_reference_oxygen", default=Z_REFERENCE_OXYGEN,
+                      help="Oxygen of the z-score reference datasets (default 21).")
 
     p_an.set_defaults(func=run_analyse)
 

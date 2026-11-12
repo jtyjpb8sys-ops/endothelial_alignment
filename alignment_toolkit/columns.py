@@ -1,7 +1,7 @@
 
 import pandas as pd
 
-from .config import FRAME_NAMES, THETA_NAMES, X_NAMES, Y_NAMES
+from .config import FRAME_NAMES, THETA_NAMES, X_NAMES, Y_NAMES, MAJOR_NAMES, MINOR_NAMES
 
 
 def find_column(df, possible_names, required=True):
@@ -32,6 +32,13 @@ def read_one_csv(file_path):
 
     out = df[[frame_col, theta_col, x_col, y_col]].copy()
     out.columns = ["FRAME", "THETA_RAW", "X", "Y"]
+
+    # optional ellipse axes (written by the extract stage); used for aspect ratio
+    major_col = find_column(df, MAJOR_NAMES, required=False)
+    minor_col = find_column(df, MINOR_NAMES, required=False)
+    if major_col is not None and minor_col is not None:
+        out["MAJOR"] = pd.to_numeric(df[major_col], errors="coerce")
+        out["MINOR"] = pd.to_numeric(df[minor_col], errors="coerce")
 
     for c in ["FRAME", "THETA_RAW", "X", "Y"]:
         out[c] = pd.to_numeric(out[c], errors="coerce")

@@ -5,15 +5,19 @@ from pathlib import Path
 import pandas as pd
 from .prism import make_prism_table, make_prism_combined_table
 
-from .config import PRISM_TABLES, MIN_N_FOR_CI
+from .config import (PRISM_TABLES, MIN_N_FOR_CI, DEFAULT_MATCH_DIST,
+                     Z_REFERENCE_CONDITION, Z_REFERENCE_OXYGEN)
 from .processing import combine_split_files
 from .quadrants import assign_quadrants
 from .summarise import summarise_frames
 from .outputs import make_output_folders
+from .tracking import add_movement
+from .zscores import write_zscore_outputs
 
 
 def analyse_folder(input_dir, output_dir=None, theta_units="radians",
-                   ci=95.0, field_size=1992.0):
+                   ci=95.0, field_size=1992.0, match_dist=DEFAULT_MATCH_DIST,
+                   z_condition=Z_REFERENCE_CONDITION, z_oxygen=Z_REFERENCE_OXYGEN):
     input_dir = Path(input_dir)
     if not input_dir.exists():
         raise SystemExit(f"Input folder does not exist: {input_dir}")
@@ -33,15 +37,21 @@ def analyse_folder(input_dir, output_dir=None, theta_units="radians",
     qc_rows = []                                   
     for csv_path in csv_files:
         dataset_name = csv_path.stem
-        combined = combine_split_files([csv_path], theta_units)
+        try:
+            combined = combine_split_files([csv_path], theta_units)
+        except ValueError as err:          # not a per-ROI CSV (e.g. a Prism / summary table)
+            print(f"  {dataset_name}: not a per-ROI CSV, skipped ({str(err).splitlines()[0]})")
+            continue
         if combined.empty:
             print(f"  {dataset_name}: no valid data, skipped.")
             continue
         combined, xmid, ymid = assign_quadrants(combined, field)
+        combined, dup_frames = add_movement(combined, max_dist=match_dist)
         parts = dataset_name.split("_", 1)
         oxygen = parts[0]
         condition = parts[1] if len(parts) > 1 else ""
-        summary = summarise_frames(combined, dataset_name, oxygen, condition, ci)
+        summary = summarise_frames(combined, dataset_name, oxygen, condition, ci,
+                                   duplicate_frames=dup_frames)
         summary.to_csv(
             folders["per_dataset"] / f"{dataset_name}_summary.csv", index=False
         )
@@ -61,6 +71,8 @@ def analyse_folder(input_dir, output_dir=None, theta_units="radians",
                  index=False)
 
         quad_counts = summary.loc[summary["REGION"] != "Qtotal", "n_ROIs"]
+        total = summary[summary["REGION"] == "Qtotal"]
+        frame_counts = total["n_ROIs"]
         qc_rows.append({
             "DATASET": dataset_name,
             "oxygen": oxygen,
@@ -72,15 +84,23 @@ def analyse_folder(input_dir, output_dir=None, theta_units="radians",
             "MEDIAN_ROIS_PER_QUADRANT_FRAME": float(quad_counts.median()),
             "MAX_ROIS_PER_QUADRANT_FRAME": int(quad_counts.max()),
             "N_QUADRANT_FRAMES_BELOW_CI_MIN": int((quad_counts < MIN_N_FOR_CI).sum()),
+            "MIN_ROIS_PER_FRAME": int(frame_counts.min()),
+            "MEDIAN_ROIS_PER_FRAME": float(frame_counts.median()),
+            "MEDIAN_CELLS_MATCHED_PER_FRAME": float(total["n_matched"].median()),
+            "DUPLICATED_FRAMES": " ".join(str(f) for f in dup_frames),
         })
 
         all_summaries.append(summary)
-        print(f"  {dataset_name}: {summary['FRAME'].nunique()} hours summarised.")
+        note = f" (duplicated frames: {dup_frames})" if dup_frames else ""
+        print(f"  {dataset_name}: {summary['FRAME'].nunique()} hours summarised.{note}")
 
     if all_summaries:
-        pd.concat(all_summaries, ignore_index=True).to_csv(
-            folders["combined"] / "ALL_summaries_long.csv", index=False
-        )
+        combined_all = pd.concat(all_summaries, ignore_index=True)
+        combined_all.to_csv(folders["combined"] / "ALL_summaries_long.csv", index=False)
+        # z-scores need several datasets (incl. the reference) in one folder; with a single
+        # dataset only its all-frame means are written
+        status = write_zscore_outputs(combined_all, output_dir, z_condition, z_oxygen)
+        print(f"  {status}")
 
     if qc_rows:                                    
         pd.DataFrame(qc_rows).to_csv(

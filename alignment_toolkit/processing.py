@@ -24,4 +24,7 @@ def combine_split_files(file_list, theta_units):
     combined["THETA_DEG_FOLDED"] = np.degrees(
         np.arccos(np.sqrt((combined["AP"].clip(-1, 1) + 1) / 2))
     )
+    if "MAJOR" in combined.columns and "MINOR" in combined.columns:
+        minor = combined["MINOR"].where(combined["MINOR"] > 0)
+        combined["AR"] = combined["MAJOR"] / minor      # aspect ratio, 1 = round
     return combined

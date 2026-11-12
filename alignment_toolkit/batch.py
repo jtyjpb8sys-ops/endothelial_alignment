@@ -8,6 +8,8 @@ import pandas as pd
 
 from .cellpose_extract import folder_to_dataset_csv
 from .analysis import analyse_folder
+from .config import Z_REFERENCE_CONDITION, Z_REFERENCE_OXYGEN
+from .zscores import write_zscore_outputs
 
 
 def choose_folder_with_dialog(title="Select the Cell line folder"):
@@ -53,7 +55,8 @@ def dataset_name_from_path(oxygen, flow, replicate):
     return f"{ox}_{cond}_{rep}"
 
 def run_batch(cell_line_dir, stage="both", theta_units="radians", ci=95.0,
-              field_size=1992.0, reference_deg=0.0, min_area=0):
+              field_size=1992.0, reference_deg=0.0, min_area=0, match_dist=35.0,
+              z_condition=Z_REFERENCE_CONDITION, z_oxygen=Z_REFERENCE_OXYGEN):
     cell_line_dir = Path(cell_line_dir)
     replicates = find_replicate_folders(cell_line_dir)
     if not replicates:
@@ -61,6 +64,7 @@ def run_batch(cell_line_dir, stage="both", theta_units="radians", ci=95.0,
     print(f"Found {len(replicates)} replicate(s), stage={stage}.\n")
 
     qc_all = []
+    summaries_all = []
     for oxygen, flow, replicate, rep_dir in replicates:
         name = dataset_name_from_path(oxygen, flow, replicate)
         print(f"=== {name}   ({rep_dir.name}) ===")
@@ -79,18 +83,32 @@ def run_batch(cell_line_dir, stage="both", theta_units="radians", ci=95.0,
                       f"(run extract first)")
                 continue
             output_dir = analyse_folder(out_dir, theta_units=theta_units,
-                                        ci=ci, field_size=field_size)
+                                        ci=ci, field_size=field_size,
+                                        match_dist=match_dist,
+                                        z_condition=z_condition, z_oxygen=z_oxygen)
             print(f"  analysed -> {out_dir}\n")
 
             qc_path = output_dir / "QC" / "QC_summary.csv"
             if qc_path.exists():
                 qc_all.append(pd.read_csv(qc_path))
+            sum_path = output_dir / "Combined" / "ALL_summaries_long.csv"
+            if sum_path.exists():
+                summaries_all.append(pd.read_csv(sum_path))
 
     if qc_all:
         combined_qc = pd.concat(qc_all, ignore_index=True)
         combined_qc.to_csv(cell_line_dir / "ALL_QC_summary.csv", index=False)
         print(f"Combined QC for {len(qc_all)} datasets -> "
               f"{cell_line_dir / 'ALL_QC_summary.csv'}")
+
+    # every dataset of the cell line together: one long table, dataset means and z-scores
+    if summaries_all:
+        root_out = cell_line_dir / f"Cell_line_summary_{roi_folder_name(reference_deg)}"
+        (root_out / "Combined").mkdir(parents=True, exist_ok=True)
+        combined = pd.concat(summaries_all, ignore_index=True)
+        combined.to_csv(root_out / "Combined" / "ALL_summaries_long.csv", index=False)
+        status = write_zscore_outputs(combined, root_out, z_condition, z_oxygen)
+        print(f"Cell-line summary for {combined['DATASET'].nunique()} datasets -> {root_out} ({status})")
 
 def roi_folder_name(reference_deg):
     if reference_deg == 0:

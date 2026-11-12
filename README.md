@@ -10,7 +10,11 @@ write one per-dataset CSV of orientation angles and centroids.
 
 **Stage 2 — `analyse`:** read that CSV, compute the Alignment Parameter (AP),
 split each frame into four equal-area quadrants plus the whole frame, and report
-per-frame median, confidence interval and IQR.
+per-frame median, confidence interval and IQR. Alongside AP it reports
+orientation order, the shared axis, aspect ratio and cell movement between
+frames (speed and direction), all from the same CSV, and z-scores of each
+dataset's mean against a reference condition. It only calculates and tabulates;
+no statistics, comparisons or figures are produced.
 
 For every frame you get five sets of outputs:
 
@@ -18,7 +22,10 @@ For every frame you get five sets of outputs:
 - `Qtotal` — all ROIs in the frame
 
 Each of the five reports the Alignment Parameter (AP) and the folded orientation
-angle, with: median, confidence interval, n ROIs, and interquartile range.
+angle, with: median, confidence interval, n ROIs, and interquartile range; plus
+the orientation-order, shape and movement measures described under
+[Additional measures](#additional-measures). Z-scores are described under
+[Z-scores](#z-scores).
 
 ## Project layout
 
@@ -33,6 +40,9 @@ endothelial_alignment/
     ├── processing.py           # combine CSVs and derive AP + folded angle
     ├── quadrants.py            # assign each ROI to a quadrant
     ├── stats.py                # median CI (order-statistic), quartiles
+    ├── morphology.py           # orientation order, shared axis, mean AP, aspect ratio
+    ├── tracking.py             # frame-to-frame cell matching, speed and direction
+    ├── zscores.py              # per-dataset means and z-scores vs a reference condition
     ├── summarise.py            # per-frame x region summary table
     ├── prism.py                # reshape into wide GraphPad Prism tables
     ├── analysis.py             # shared analyse logic (CSV folder -> summaries)
@@ -97,6 +107,95 @@ A folded orientation angle is also reported:
 - `theta_deg` — orientation folded to 0-90 degrees, giving an absolute measure
   of deviation from the reference axis.
 
+## Additional measures
+
+All of these are calculated for every frame and every region (Q1–Q4 and
+`Qtotal`) from the stage 1 CSV. Angles are each cell's long-axis angle θ from
+the reference (flow) axis, after `--reference_deg` has been applied.
+
+### Orientation order and shared axis (`morphology.py`)
+
+A cell's axis has no head or tail (a cell at +80° and one at −100° lie on the
+same line), so the averages use the doubled angle 2θ:
+
+- `C = mean cos(2θ)` and `Sn = mean sin(2θ)` over the cells in the region
+- `order_S = √(C² + Sn²)` — orientation order: 0 = cells point in random
+  directions, 1 = every cell lies on the same axis, whatever that axis is
+- `axis_vs_flow_deg = |½·atan2(Sn, C)|` in degrees — the shared axis relative
+  to the flow axis: 0° = along the flow, 90° = across it
+
+The shared axis is only meaningful when `order_S` is reasonably high (above
+about 0.1); with random orientations it is noise.
+
+### Aspect ratio
+
+- `AR_median`, `AR_mean` — median and mean of `MAJOR / MINOR` (the fitted
+  ellipse's long and short axes). 1 = round; higher = more elongated. Needs the
+  `MAJOR` and `MINOR` columns written by the extract stage; if they are absent,
+  these columns are empty.
+
+### Cell movement between frames (`tracking.py`)
+
+Cellpose labels restart in every frame, so cells are matched between
+consecutive frames using their centroids (`POSITION_X`, `POSITION_Y`) only:
+
+1. every cell at hour t−1 is paired with its nearest cell at hour t, and every
+   cell at hour t with its nearest cell at hour t−1;
+2. a pair is kept only if the two cells are each other's nearest neighbour and
+   are less than `--match_dist` pixels apart (default 35 px, about half a cell
+   length). Cells that leave the field, divide, are missed by Cellpose or are
+   ambiguous stay unmatched;
+3. for each kept pair: `dx = x(t) − x(t−1)`, `dy = y(t) − y(t−1)`,
+   `d = √(dx² + dy²)`.
+
+Reported per region at hour t (movement from t−1 to t; hour 0 is empty):
+
+| Column | Meaning |
+|---|---|
+| `n_matched` | cells matched to the previous frame |
+| `speed_mean` | mean d over matched cells (px per frame interval = px/h for hourly frames) |
+| `net_dx_mean` | mean dx: + = moving left → right (with flow), − = against flow |
+| `net_dy_mean` | mean dy, across the flow: a check that should be about 0 without drift |
+| `direction_index` | mean of dx / d over matched cells that moved (d > 0): +1 = all moving with flow, −1 = all against it |
+
+Movement is counted in the region where the cell is at hour t. Flow is assumed
+to run left → right along the image x axis; for slides where it runs another
+way, the sign of `net_dx_mean` and `direction_index` follows the image x axis,
+not the flow.
+
+Pairs of identical consecutive frames (the same segmentation saved twice) are
+detected: the copy is flagged `DUPLICATE_FRAME = True` in the summary tables,
+its movement is left empty rather than reported as zero, and the frames are
+listed in the QC file (`DUPLICATED_FRAMES`).
+
+With hourly frames, cells can move a large part of their own length between
+frames, so some pairs will be wrong matches; the distance limit caps their
+effect. Shorter frame intervals make matching more reliable and allow a
+smaller `--match_dist`.
+
+All distances are in pixels; multiply by the pixel size (µm/px) to convert.
+
+## Z-scores
+
+After analysing a folder (or, in `batch`, after every replicate of a cell line
+has been analysed), each dataset's measures are averaged over all frames that
+have a value, per region (movement measures start at frame 1; frames flagged
+`DUPLICATE_FRAME` — identical copies of the previous frame — are left out for
+every measure). Each average is then z-scored per measure and
+region:
+
+    z = (dataset mean − mean of the reference datasets) / SD of all datasets in the run
+
+The reference datasets are those named `<oxygen>_<condition>_<replicate>` with
+oxygen `--z_reference_oxygen` (default `21`) and condition
+`--z_reference_condition` (default `Static`). z = 0 is the reference average,
++1 is one dataset-to-dataset SD above it. Measures z-scored: `AP_median`,
+`order_S`, `axis_vs_flow_deg`, `AR_median`, `AR_mean`, `n_matched`,
+`speed_mean`, `net_dx_mean`, `net_dy_mean`, `direction_index`.
+
+If the run has no reference datasets (for example a single replicate folder),
+only the dataset means are written.
+
 ## Naming convention
 
 Datasets are named `oxygen_condition_replicate`, e.g. `21_4dyn_laminar_1`. In
@@ -133,8 +232,10 @@ Stage 1 expects a folder of Cellpose outputs:
 - `*_cp_masks.png` (used only if no `.npy` files are present)
 
 Stage 2 expects the per-dataset CSV produced by stage 1, containing `FRAME`,
-`ELLIPSE_THETA`, `POSITION_X`, `POSITION_Y`. Rows with missing values are
-dropped automatically.
+`ELLIPSE_THETA`, `POSITION_X`, `POSITION_Y` (and `MAJOR`, `MINOR` for aspect
+ratio; without them the aspect-ratio columns are left empty). Rows with missing
+values are dropped automatically. Other CSVs in the folder that lack these
+columns (e.g. exported Prism tables) are skipped with a message.
 
 ## Usage
 
@@ -169,6 +270,10 @@ Analyse options:
 - `--theta_units` — `radians` (default) or `degrees`
 - `--ci` — confidence level, default 95
 - `--field_size` — square image edge length in px (default 1992)
+- `--match_dist` — maximum distance in px for matching a cell between frames
+  (default 35)
+- `--z_reference_oxygen`, `--z_reference_condition` — datasets used as the
+  z-score reference (default `21` and `Static`)
 
 **Batch — process a whole cell-line tree in one go:**
 
@@ -213,7 +318,8 @@ python main.py batch --input_dir /path/to/HUtMEC --stage analyse --reference_deg
 ```
 
 Other batch options mirror the two stages: `--theta_units`, `--ci`,
-`--field_size`, `--min_area`.
+`--field_size`, `--min_area`, `--match_dist`, `--z_reference_oxygen`,
+`--z_reference_condition`.
 
 To analyse a single replicate on its own (for spot-checks or reprocessing one
 dataset), point `analyse` straight at that replicate's ROI folder:
@@ -231,16 +337,32 @@ inside the replicate's ROI folder):
 - `Prism/AP_Median`, `Prism/AP_CI_low`, `Prism/AP_CI_high`,
   `Prism/ThetaDeg_Median` — wide tables (frames down, quadrants across) for
   GraphPad Prism
+- `Prism/Order_S`, `Prism/Axis_vs_Flow_Deg`, `Prism/AspectRatio_Median`,
+  `Prism/AspectRatio_Mean`, `Prism/Cells_Matched`, `Prism/Speed_Mean`,
+  `Prism/NetDX_Mean`, `Prism/NetDY_Mean`, `Prism/Direction_Index` — the same
+  layout for each additional measure
+- `Prism/Dataset_Means/<measure>/` and `Prism/Z_Scores/<measure>/` — grouped
+  tables, one row per condition and one column per oxygen × replicate
+  (`..._whole_frame.csv`) or oxygen × replicate × quadrant (`..._quadrants.csv`)
+- `Z_Scores/ALL_dataset_means_long.csv`, `Z_Scores/ALL_zscores_long.csv` — the
+  same values in long format (one row per dataset × region)
 - `Prism/AP_Median/<name>_AP_median_IQR.csv` and `..._AP_median_CI.csv` —
   combined tables where each cell reads `median [low, high]` (3 decimals), one
   file using the interquartile range as the bounds, the other the confidence
   interval
-- `Combined/ALL_summaries_long.csv` — every dataset stacked into one table
+- `Combined/ALL_summaries_long.csv` — every dataset stacked into one table,
+  one row per dataset × frame × region with every measure (the table to open
+  in Excel)
 - `QC/QC_summary.csv` — per-dataset quality check: frame count, min/median/max
   ROIs per quadrant-frame, and how many quadrant-frames fell below the minimum
-  needed for a confidence interval (`N_QUADRANT_FRAMES_BELOW_CI_MIN`)
+  needed for a confidence interval (`N_QUADRANT_FRAMES_BELOW_CI_MIN`); min and
+  median ROIs per whole frame, the median number of cells matched between
+  frames, and any duplicated frames
 
-After a batch run, a combined QC file for every dataset processed is written at
-the cell-line root as `ALL_QC_summary.csv` — one row per dataset, so the whole
+After a batch run, every dataset of the cell line is also gathered into
+`Cell_line_summary_<ROI folder>/` at the cell-line root: `Combined/ALL_summaries_long.csv`
+(all datasets), `Z_Scores/` and `Prism/Dataset_Means`, `Prism/Z_Scores` as
+above, calculated across the whole cell line. A combined QC file for every
+dataset processed is written at the cell-line root as `ALL_QC_summary.csv` — one row per dataset, so the whole
 experiment's data quality can be scanned at a glance (sparse or failed wells show
 up as high `N_QUADRANT_FRAMES_BELOW_CI_MIN` values).
