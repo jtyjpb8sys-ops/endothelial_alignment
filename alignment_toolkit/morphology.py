@@ -1,4 +1,4 @@
-"""Orientation order, shared axis and aspect ratio for one group of ROIs (a quadrant or the whole frame).
+"""Orientation order, shared axis, aspect ratio and cell length for one group of ROIs (a quadrant or the whole frame).
 
 All angles are the ROI's long-axis angle THETA_RAD, measured from the reference (flow) axis.
 Cell axes have no head or tail (a cell at +80 deg and one at -100 deg lie on the same line), so the
@@ -37,4 +37,11 @@ def shape_metrics(rdf):
         out["AR_mean"] = float(ar.mean()) if ar.size else np.nan
     else:
         out["AR_median"] = out["AR_mean"] = np.nan
+    if "LENGTH" in rdf.columns:
+        ln = rdf["LENGTH"].to_numpy(dtype=float)
+        ln = ln[np.isfinite(ln)]
+        out["length_median"] = float(np.median(ln)) if ln.size else np.nan
+        out["length_mean"] = float(ln.mean()) if ln.size else np.nan
+    else:
+        out["length_median"] = out["length_mean"] = np.nan
     return out

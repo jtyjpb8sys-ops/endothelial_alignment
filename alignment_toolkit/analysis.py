@@ -17,7 +17,8 @@ from .zscores import write_zscore_outputs
 
 def analyse_folder(input_dir, output_dir=None, theta_units="radians",
                    ci=95.0, field_size=1992.0, match_dist=DEFAULT_MATCH_DIST,
-                   z_condition=Z_REFERENCE_CONDITION, z_oxygen=Z_REFERENCE_OXYGEN):
+                   z_condition=Z_REFERENCE_CONDITION, z_oxygen=Z_REFERENCE_OXYGEN,
+                   per_cell=False):
     input_dir = Path(input_dir)
     if not input_dir.exists():
         raise SystemExit(f"Input folder does not exist: {input_dir}")
@@ -47,6 +48,12 @@ def analyse_folder(input_dir, output_dir=None, theta_units="radians",
             continue
         combined, xmid, ymid = assign_quadrants(combined, field)
         combined, dup_frames = add_movement(combined, max_dist=match_dist)
+        if per_cell:      # every cell: position, quadrant, angle, shape, length and movement
+            cols = [c for c in ["FRAME", "X", "Y", "QUADRANT", "THETA_RAD", "AP", "AREA", "MAJOR", "MINOR",
+                                "AR", "LENGTH", "MATCHED", "DX", "DY", "DIST"] if c in combined.columns]
+            pc_dir = output_dir / "Per_Cell"
+            pc_dir.mkdir(parents=True, exist_ok=True)
+            combined[cols].round(6).to_csv(pc_dir / f"{dataset_name}_cells.csv", index=False)
         parts = dataset_name.split("_", 1)
         oxygen = parts[0]
         condition = parts[1] if len(parts) > 1 else ""

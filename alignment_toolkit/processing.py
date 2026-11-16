@@ -27,4 +27,8 @@ def combine_split_files(file_list, theta_units):
     if "MAJOR" in combined.columns and "MINOR" in combined.columns:
         minor = combined["MINOR"].where(combined["MINOR"] > 0)
         combined["AR"] = combined["MAJOR"] / minor      # aspect ratio, 1 = round
+        if "AREA" in combined.columns:
+            # cell length from mask area and aspect ratio: 2 * sqrt(A * AR / pi)
+            # (the major axis of an ellipse with the measured pixel area and aspect ratio)
+            combined["LENGTH"] = 2.0 * np.sqrt(combined["AREA"] * combined["AR"] / np.pi)
     return combined

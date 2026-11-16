@@ -56,7 +56,8 @@ def dataset_name_from_path(oxygen, flow, replicate):
 
 def run_batch(cell_line_dir, stage="both", theta_units="radians", ci=95.0,
               field_size=1992.0, reference_deg=0.0, min_area=0, match_dist=35.0,
-              z_condition=Z_REFERENCE_CONDITION, z_oxygen=Z_REFERENCE_OXYGEN):
+              z_condition=Z_REFERENCE_CONDITION, z_oxygen=Z_REFERENCE_OXYGEN,
+              per_cell=False):
     cell_line_dir = Path(cell_line_dir)
     replicates = find_replicate_folders(cell_line_dir)
     if not replicates:
@@ -85,7 +86,8 @@ def run_batch(cell_line_dir, stage="both", theta_units="radians", ci=95.0,
             output_dir = analyse_folder(out_dir, theta_units=theta_units,
                                         ci=ci, field_size=field_size,
                                         match_dist=match_dist,
-                                        z_condition=z_condition, z_oxygen=z_oxygen)
+                                        z_condition=z_condition, z_oxygen=z_oxygen,
+                                        per_cell=per_cell)
             print(f"  analysed -> {out_dir}\n")
 
             qc_path = output_dir / "QC" / "QC_summary.csv"

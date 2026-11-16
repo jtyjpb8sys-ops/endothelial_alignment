@@ -28,6 +28,7 @@ def run_analyse(args):
         theta_units=args.theta_units, ci=args.ci, field_size=args.field_size,
         match_dist=args.match_dist,
         z_condition=args.z_reference_condition, z_oxygen=args.z_reference_oxygen,
+        per_cell=args.per_cell,
     )
     print(f"\nDone. Outputs in: {output_dir}")
 
@@ -57,7 +58,8 @@ def run_batch_cmd(args):
               min_area=args.min_area,
               match_dist=args.match_dist,
               z_condition=args.z_reference_condition,
-              z_oxygen=args.z_reference_oxygen)
+              z_oxygen=args.z_reference_oxygen,
+              per_cell=args.per_cell)
     
 def main():
     parser = argparse.ArgumentParser(
@@ -100,6 +102,8 @@ def main():
                       help="Condition used as the z-score reference (default Static).")
     p_ba.add_argument("--z_reference_oxygen", default=Z_REFERENCE_OXYGEN,
                       help="Oxygen of the z-score reference datasets (default 21).")
+    p_ba.add_argument("--per_cell", action="store_true",
+                      help="Also write every cell's values (incl. aspect ratio and cell length) to Per_Cell/.")
     p_ba.set_defaults(func=run_batch_cmd)
 
     p_an.add_argument("--theta_units", choices=["radians", "degrees"],
@@ -112,6 +116,8 @@ def main():
                       help="Condition used as the z-score reference (default Static).")
     p_an.add_argument("--z_reference_oxygen", default=Z_REFERENCE_OXYGEN,
                       help="Oxygen of the z-score reference datasets (default 21).")
+    p_an.add_argument("--per_cell", action="store_true",
+                      help="Also write every cell's values (incl. aspect ratio and cell length) to Per_Cell/.")
 
     p_an.set_defaults(func=run_analyse)
 

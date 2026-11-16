@@ -134,6 +134,19 @@ about 0.1); with random orientations it is noise.
   `MAJOR` and `MINOR` columns written by the extract stage; if they are absent,
   these columns are empty.
 
+### Cell length
+
+- `length_median`, `length_mean` — median and mean cell length per region, where each
+  cell's length is calculated from its mask area `A` (`AREA`, pixel count) and
+  aspect ratio `AR`:
+
+      length = 2·√(A · AR / π)
+
+  This is the major axis of an ellipse with the cell's measured area and aspect
+  ratio. Because A × AR ∝ length², it combines size and elongation in one value:
+  a small elongated cell and a large elongated cell with the same aspect ratio get
+  different lengths. Needs `AREA`, `MAJOR` and `MINOR`; otherwise empty. Units: px.
+
 ### Cell movement between frames (`tracking.py`)
 
 Cellpose labels restart in every frame, so cells are matched between
@@ -190,7 +203,8 @@ The reference datasets are those named `<oxygen>_<condition>_<replicate>` with
 oxygen `--z_reference_oxygen` (default `21`) and condition
 `--z_reference_condition` (default `Static`). z = 0 is the reference average,
 +1 is one dataset-to-dataset SD above it. Measures z-scored: `AP_median`,
-`order_S`, `axis_vs_flow_deg`, `AR_median`, `AR_mean`, `n_matched`,
+`order_S`, `axis_vs_flow_deg`, `AR_median`, `AR_mean`, `length_median`,
+`length_mean`, `n_matched`,
 `speed_mean`, `net_dx_mean`, `net_dy_mean`, `direction_index`.
 
 If the run has no reference datasets (for example a single replicate folder),
@@ -274,6 +288,8 @@ Analyse options:
   (default 35)
 - `--z_reference_oxygen`, `--z_reference_condition` — datasets used as the
   z-score reference (default `21` and `Static`)
+- `--per_cell` — also write every cell's values (position, quadrant, angle,
+  area, axes, aspect ratio, cell length, movement) to `Per_Cell/`
 
 **Batch — process a whole cell-line tree in one go:**
 
@@ -319,7 +335,7 @@ python main.py batch --input_dir /path/to/HUtMEC --stage analyse --reference_deg
 
 Other batch options mirror the two stages: `--theta_units`, `--ci`,
 `--field_size`, `--min_area`, `--match_dist`, `--z_reference_oxygen`,
-`--z_reference_condition`.
+`--z_reference_condition`, `--per_cell`.
 
 To analyse a single replicate on its own (for spot-checks or reprocessing one
 dataset), point `analyse` straight at that replicate's ROI folder:
@@ -338,7 +354,8 @@ inside the replicate's ROI folder):
   `Prism/ThetaDeg_Median` — wide tables (frames down, quadrants across) for
   GraphPad Prism
 - `Prism/Order_S`, `Prism/Axis_vs_Flow_Deg`, `Prism/AspectRatio_Median`,
-  `Prism/AspectRatio_Mean`, `Prism/Cells_Matched`, `Prism/Speed_Mean`,
+  `Prism/AspectRatio_Mean`, `Prism/CellLength_Median`, `Prism/CellLength_Mean`,
+  `Prism/Cells_Matched`, `Prism/Speed_Mean`,
   `Prism/NetDX_Mean`, `Prism/NetDY_Mean`, `Prism/Direction_Index` — the same
   layout for each additional measure
 - `Prism/Dataset_Means/<measure>/` and `Prism/Z_Scores/<measure>/` — grouped

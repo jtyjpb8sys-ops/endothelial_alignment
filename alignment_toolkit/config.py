@@ -20,6 +20,7 @@ X_NAMES = ["POSITION_X", "x"]
 Y_NAMES = ["POSITION_Y", "y"]
 MAJOR_NAMES = ["MAJOR", "major"]
 MINOR_NAMES = ["MINOR", "minor"]
+AREA_NAMES = ["AREA", "area"]
 
 # --- Prism export map ---#
 PRISM_TABLES = {
@@ -32,6 +33,8 @@ PRISM_TABLES = {
     "Axis_vs_Flow_Deg":   "axis_vs_flow_deg",
     "AspectRatio_Median": "AR_median",
     "AspectRatio_Mean":   "AR_mean",
+    "CellLength_Median":  "length_median",
+    "CellLength_Mean":    "length_mean",
     # movement between frames (tracking.py)
     "Cells_Matched":      "n_matched",
     "Speed_Mean":         "speed_mean",
@@ -51,6 +54,8 @@ Z_MEASURES = {                     # summary column : output name
     "axis_vs_flow_deg": "Axis_vs_Flow_Deg",
     "AR_median":        "AspectRatio_Median",
     "AR_mean":          "AspectRatio_Mean",
+    "length_median":    "CellLength_Median",
+    "length_mean":      "CellLength_Mean",
     "n_matched":        "Cells_Matched",
     "speed_mean":       "Speed_Mean",
     "net_dx_mean":      "NetDX_Mean",
